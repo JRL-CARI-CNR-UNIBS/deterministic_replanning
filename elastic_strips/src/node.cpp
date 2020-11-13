@@ -124,8 +124,8 @@ int main(int argc, char **argv)
   }
 
   // posizioni giunti nominali: quelle della traiettoria se non ci fosse l'uomo
-  Eigen::VectorXd q_nom(chain->getActiveJointsNumber()); //posizione target
-  Eigen::VectorXd Dq_nom(chain->getActiveJointsNumber()); // velocità target
+  Eigen::VectorXd q_nom(chain->getActiveJointsNumber()); //posizione nominali
+  Eigen::VectorXd Dq_nom(chain->getActiveJointsNumber()); // velocità nominali
 
   // per ora supponiamo q_nom costante
   q_nom.setZero();
@@ -246,7 +246,7 @@ int main(int argc, char **argv)
   joint_target=joint_states;
 
   double st=2e-3;
-  ros::Rate rate(1.0/st); // cicla a 2 ms (tempo macchina)
+  ros::Rate rate(1.0/st); // cicla a 2 ms
 
 
   // vettore dei punti rappresentanti l'uomo
@@ -299,9 +299,10 @@ int main(int argc, char **argv)
     {
       Eigen::Vector3d spring=link_springs.at(link_name);
       Eigen::Vector3d damper=link_dampers.at(link_name);
+      double activation_distance=link_activation_distances.at(link_name);
+
       Eigen::Vector3d self_spring=link_self_springs.at(link_name);
       Eigen::Vector3d self_damper=link_self_dampers.at(link_name);
-      double activation_distance=link_activation_distances.at(link_name);
 
       // la matrice Affine3d rappresenta una matrica 4x4 di transformazione.
       // ATTENZIONE: la matrice di rotazione si chiama linear() perché è un'operazione lineare nello spazio affine....
@@ -336,7 +337,7 @@ int main(int argc, char **argv)
         {
 
           Eigen::Vector3d versor=(human_point_in_b-o_l_in_b).normalized();
-          // esempio=controllare segni e modficare nel caso
+          // esempio=controllare segni e modificare nel caso
           elastic_force_on_l_in_b+=spring.cwiseProduct(versor*(distance-activation_distance));
         }
       }
@@ -363,11 +364,7 @@ int main(int argc, char **argv)
 
 
 
-
-
-    std::vector<Eigen::Affine3d, Eigen::aligned_allocator<Eigen::Affine3d>> Tbl=chain->getTransformations(q);
-
-    // coppie = B*DDq+nl(q,Dq)
+    // coppie = B(q)*DDq+nl(q,Dq)
     // dove nl contiene le coppie di Coriolis e dovute alla gravità
     Eigen::MatrixXd joint_inertia=chain->getJointInertia(q_target);
     Eigen::VectorXd nl=chain->getJointTorqueNonLinearPart(q_target,Dq_target);
