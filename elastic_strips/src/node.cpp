@@ -33,7 +33,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <sensor_msgs/JointState.h>
 #include <geometry_msgs/PoseArray.h>
-
+#include <std_msgs/Float64.h>
 
 // libreria di dinamica
 #include <rosdyn_core/primitives.h>
@@ -46,6 +46,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // convertire messaggi nella libreria Eigen
 #include <eigen_conversions/eigen_msg.h>
+
 
 int main(int argc, char **argv)
 {
@@ -86,7 +87,9 @@ int main(int argc, char **argv)
 
   // subscription notifier offre delle funzioni per gestire la ricezione del topic.
   ros_helper::SubscriptionNotifier<sensor_msgs::JointState> js_sub(nh,"/manipulator/joint_states",10);
+  ros_helper::SubscriptionNotifier<sensor_msgs::JointState> jt_sub(nh,"/strip/joint_target",10);
   ros_helper::SubscriptionNotifier<geometry_msgs::PoseArray> poses_sub(nh,"/poses",10);
+  ros_helper::SubscriptionNotifier<std_msgs::Float64> ex_ratio_sub(nh,"/execution_ratio",10);
 
   // se si sta usando Gazebo, il /clock è fornito da Gazebo, per dare tempo al nodo di riceverlo aspettiamo un secondo.
   ros::WallDuration(1).sleep();
@@ -96,6 +99,13 @@ int main(int argc, char **argv)
   if (!js_sub.waitForANewData(ros::Duration(200)))
   {
     ROS_ERROR("No data from /manipulator/joint_states");
+    return 0;
+  }
+
+  // aspetto che arrivi un dato per 200 secondi
+  if (!ex_ratio_sub.waitForANewData(ros::Duration(200)))
+  {
+    ROS_ERROR("No data from /execution_ratio");
     return 0;
   }
 
@@ -241,6 +251,24 @@ int main(int argc, char **argv)
 
 
 
+  Eigen::VectorXd max_deflection(chain->getActiveJointsNumber());
+  std::vector<double> max_deflection_vec;
+  if (!nh.getParam("max_joint_deflaction",joint_spring_vec))
+  {
+    ROS_INFO("max_joint_deflaction is not defined. set equal to 0");
+    max_deflection.setConstant(0.1);
+  }
+  else
+  {
+    for (unsigned int idx=0;idx<chain->getActiveJointsNumber();idx++)
+      max_deflection(idx)=max_deflection_vec.at(idx);
+  }
+
+  Eigen::VectorXd upper_limit=chain->getQMax();
+  Eigen::VectorXd lower_limit=chain->getQMin();
+  Eigen::VectorXd Dq_max=chain->getDQMax();
+  Eigen::VectorXd DDq_max=5*Dq_max; //ipotesi
+
   ros::Publisher jt_pub=nh.advertise<sensor_msgs::JointState>("/manipulator/joint_target",1);
   sensor_msgs::JointState joint_target;
   joint_target=joint_states;
@@ -256,6 +284,9 @@ int main(int argc, char **argv)
   {
 
     ros::spinOnce(); // ricevo i messaggi se ne è arrivato qualcuno
+
+    double execution_ratio=ex_ratio_sub.getData().data; // std_msgs/Float64 ha un campo chiamato data che contiene il double
+
     joint_states=js_sub.getData();
     if (!name_sorting::permutationName(chain->getMoveableJointNames(),
                                       joint_states.name,
@@ -271,13 +302,29 @@ int main(int argc, char **argv)
       q(idx)=joint_states.position.at(idx); // notare la differenza nell'accedere all'elemento in Eigen::VectorXd e std::vector
       Dq(idx)=joint_states.velocity.at(idx);
     }
+    if (jt_sub.isANewDataAvailable())
+    {
+      sensor_msgs::JointState joint_setpoint=jt_sub.getData();
+      if (!name_sorting::permutationName(chain->getMoveableJointNames(),
+                                        joint_setpoint.name,
+                                        joint_setpoint.position,
+                                        joint_setpoint.velocity))
+      {
+        ROS_ERROR("some joints are missing");
+        return 0;
+      }
+      for (unsigned int idx=0;idx<chain->getActiveJointsNumber();idx++)
+      {
+        q_nom(idx)=joint_setpoint.position.at(idx); // notare la differenza nell'accedere all'elemento in Eigen::VectorXd e std::vector
+        Dq_nom(idx)=joint_setpoint.velocity.at(idx);
+      }
+    }
 
 
 
     if (poses_sub.isANewDataAvailable())
     {
       human_points_in_b.clear();
-
       geometry_msgs::PoseArray human_poses_in_b=poses_sub.getData();  // punti dell'umano nel frame base (b)
       if (base_frame.compare(human_poses_in_b.header.frame_id)!=0)
       {
@@ -324,22 +371,29 @@ int main(int argc, char **argv)
       self_damping_force_on_l_in_b=self_damper.cwiseProduct(twist_on_lnom_in_b.head(3)-twist_on_l_in_b.head(3));
 
 
+
       Eigen::Vector3d elastic_force_on_l_in_b;
       elastic_force_on_l_in_b.setZero();
       Eigen::Vector3d damping_force_on_l_in_b;
       damping_force_on_l_in_b.setZero();
 
-      for (const Eigen::Vector3d& human_point_in_b: human_points_in_b)
+      if (activation_distance>0)
       {
-        // implementa forze repulsive e sommale
-        double distance=(human_point_in_b-o_l_in_b).norm();
-        if (distance<activation_distance)
+        double min_distance=std::numeric_limits<double>::infinity();
+        for (const Eigen::Vector3d& human_point_in_b: human_points_in_b)
         {
-
-          Eigen::Vector3d versor=(human_point_in_b-o_l_in_b).normalized();
-          // esempio=controllare segni e modificare nel caso
-          elastic_force_on_l_in_b+=spring.cwiseProduct(versor*(distance-activation_distance));
+          // implementa forze repulsive e sommale
+          double distance=(human_point_in_b-o_l_in_b).norm();
+          if (distance<min_distance)
+            min_distance=distance;
+          if (distance<activation_distance)
+          {
+            Eigen::Vector3d versor=(human_point_in_b-o_l_in_b).normalized();
+            // esempio=controllare segni e modificare nel caso
+            elastic_force_on_l_in_b+=spring.cwiseProduct(versor*(distance-activation_distance));
+          }
         }
+        ROS_DEBUG_THROTTLE(0.1,"minimum distance between human and %s: %f",link_name.c_str(),min_distance);
       }
 
       Eigen::Vector3d force_on_l_in_b=self_elastic_force_on_l_in_b+self_damping_force_on_l_in_b+
@@ -378,11 +432,52 @@ int main(int argc, char **argv)
 
     // dinamica diretta
     DDq_target=joint_inertia.inverse()*(joint_torque-nl);
-    q_target+=Dq_target*st+0.5*DDq_target*std::pow(st,2);
-    Dq_target+=DDq_target*st;
 
     for (unsigned int idx=0;idx<chain->getActiveJointsNumber();idx++)
     {
+
+
+
+      double deformation_ratio=1-2*std::abs(0.5-execution_ratio); //deforma fino al limite se execution ratio=0.5, non deforma se execution ratio=0 oppure =1
+      double q_max=std::min(q_nom(idx)+deformation_ratio*max_deflection(idx),upper_limit(idx));
+      double q_min=std::max(q_nom(idx)-deformation_ratio*max_deflection(idx),lower_limit(idx));
+
+
+      // computing breacking distance
+      double t_break=std::abs(Dq_target(idx))/DDq_max(idx);
+      double breaking_distance=0.5*DDq_max(idx)*std::pow(t_break,2.0);
+
+      if (Dq_target(idx)>Dq_max(idx))
+        Dq_target(idx)=Dq_max(idx);
+      else if (Dq_target(idx)<-Dq_max(idx))
+          Dq_target(idx)=-Dq_max(idx);
+
+      if (std::abs(q_max-q_min)<0.5*DDq_max(idx)*std::pow(st,2.0)) // se l'upper e il lower bound sono molto vicini sequi traiettoria nominale
+      {
+        q_target(idx)=q_nom(idx);
+        Dq_target(idx)=Dq_nom(idx);
+        DDq_target(idx)=0;
+      }
+      else if (q_target(idx) >= (q_max-breaking_distance)) // frena per non superare upper bound
+      {
+        if (Dq_target(idx)>0)
+        {
+          ROS_WARN_THROTTLE(2,"Breaking, maximum limit approaching on joint %u",idx);
+          DDq_target(idx)=-DDq_max(idx);
+        }
+      }
+      else if (q_target(idx) <= (q_min + breaking_distance)) // frena per non superare loew bound
+      {
+        if (Dq_target(idx) < 0)
+        {
+          ROS_WARN_THROTTLE(2,"Breaking, minimum limit approaching on joint %u",idx);
+          DDq_target(idx)=+DDq_max(idx);
+        }
+      }
+
+      q_target(idx)+=Dq_target(idx)*st+0.5*DDq_target(idx)*std::pow(st,2);
+      Dq_target(idx)+=DDq_target(idx)*st;
+
       joint_target.position.at(idx)=q_target(idx);
       joint_target.velocity.at(idx)=Dq_target(idx);
     }

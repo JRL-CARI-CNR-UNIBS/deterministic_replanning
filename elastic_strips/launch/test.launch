@@ -34,7 +34,9 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
   <arg name="load_cell" default="false"/>
   <rosparam file="$(find elastic_strips)/config/params.yaml" command="load"/>
   <include if="$(arg load_cell)" file="$(find fourbythree_gazebo)/launch/load.launch"/>
-  <node name="elastic_strips" pkg="elastic_strips" type="node" output="screen" />
-  <node name="sim_human" pkg="elastic_strips" type="sim_human" output="screen" />
+  <node name="elastic_strips" pkg="elastic_strips" type="node" output="screen">
+   <remap from="poses" to="/centroid_detection_rs1/poses"/>
+  </node>
+<!--  <node name="sim_human" pkg="elastic_strips" type="sim_human" output="screen" />-->
 
 </launch>
