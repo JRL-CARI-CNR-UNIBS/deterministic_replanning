@@ -1,7 +1,7 @@
 base_frame: world
-tool_frame: flange
+tool_frame: open_tip
 
-flange:
+tool0:
   # molle di "repulsione"
   spring: [5,5,5]
   damper: [0.001,0.001,0.001]
