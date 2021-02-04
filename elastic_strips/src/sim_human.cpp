@@ -65,9 +65,13 @@ int main(int argc, char **argv)
     pose.orientation.z=0;
     pose.orientation.w=1; // orientamento come world
 
-    pose.position.x= -1.5+0.5*std::sin(t/10*2*M_PI);
-    pose.position.y=  0+0.5*std::cos(t/10*2*M_PI);
-    pose.position.z=  1;
+//    pose.position.x= -1.5+0.5*std::sin(t/10*2*M_PI);
+//    pose.position.y=  0+0.5*std::cos(t/10*2*M_PI);
+//    pose.position.z=  1;
+
+    pose.position.x=-0.40;
+    pose.position.y=0;
+    pose.position.z=1.90;
 
     human_poses.poses.push_back(pose);
     human_poses.header.stamp=ros::Time::now();

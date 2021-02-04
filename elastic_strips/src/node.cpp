@@ -253,15 +253,49 @@ int main(int argc, char **argv)
 
   Eigen::VectorXd max_deflection(chain->getActiveJointsNumber());
   std::vector<double> max_deflection_vec;
-  if (!nh.getParam("max_joint_deflaction",joint_spring_vec))
+  if (!nh.getParam("max_joint_deflaction",max_deflection_vec))
   {
-    ROS_INFO("max_joint_deflaction is not defined. set equal to 0");
+    ROS_INFO("max_joint_deflaction is not defined. set equal to 0.1");
     max_deflection.setConstant(0.1);
   }
   else
   {
     for (unsigned int idx=0;idx<chain->getActiveJointsNumber();idx++)
       max_deflection(idx)=max_deflection_vec.at(idx);
+  }
+  ROS_INFO_STREAM("max_deflection = " << max_deflection.transpose());
+
+  double max_reduction;
+  if (!nh.getParam("max_reduction",max_reduction))
+  {
+    ROS_INFO("max_reduction is not defined. set equal to 1");
+    max_reduction=1.0;
+  }
+  else
+  {
+    ROS_INFO_STREAM("max_reduction = " << max_reduction);
+  }
+
+  double upper_limit_repulsion;
+  if (!nh.getParam("upper_limit_repulsion",upper_limit_repulsion))
+  {
+    ROS_INFO("upper_limit_repulsion is not defined. set equal to 1");
+    upper_limit_repulsion=1.0;
+  }
+  else
+  {
+    ROS_INFO_STREAM("upper_limit_repulsion = " << upper_limit_repulsion);
+  }
+
+  double lower_limit_repulsion;
+  if (!nh.getParam("lower_limit_repulsion",lower_limit_repulsion))
+  {
+    ROS_INFO("lower_limit_repulsion is not defined. set equal to 0");
+    lower_limit_repulsion=0.0;
+  }
+  else
+  {
+    ROS_INFO_STREAM("lower_limit_repulsion = " << lower_limit_repulsion);
   }
 
   Eigen::VectorXd upper_limit=chain->getQMax();
@@ -273,6 +307,12 @@ int main(int argc, char **argv)
   sensor_msgs::JointState joint_target;
   joint_target=joint_states;
 
+
+  ros::Publisher dist_pub=nh.advertise<std_msgs::Float64>("/distance_human_robot",1);
+  std_msgs::Float64 distance_hr;
+  distance_hr.data=100;
+
+
   double st=2e-3;
   ros::Rate rate(1.0/st); // cicla a 2 ms
 
@@ -280,12 +320,57 @@ int main(int argc, char **argv)
   // vettore dei punti rappresentanti l'uomo
   std::vector<Eigen::Vector3d, Eigen::aligned_allocator<Eigen::Vector3d>> human_points_in_b;
 
+
+
+
+
+
+
+
   while (ros::ok())
   {
 
     ros::spinOnce(); // ricevo i messaggi se ne è arrivato qualcuno
 
     double execution_ratio=ex_ratio_sub.getData().data; // std_msgs/Float64 ha un campo chiamato data che contiene il double
+    double const_mol_spring, const_mol_self_pring;
+
+//    ROS_INFO_STREAM("execution_ratio = " << execution_ratio);
+
+    if (execution_ratio<0.5)
+    {
+        const_mol_self_pring=(0.5-execution_ratio)*2;
+        if (const_mol_self_pring<max_reduction)
+        {
+            const_mol_self_pring=max_reduction;
+        }
+    }
+    else
+    {
+        const_mol_self_pring=(execution_ratio-0.5)*2;
+        if (const_mol_self_pring<max_reduction)
+        {
+            const_mol_self_pring=max_reduction;
+        }
+    }
+
+ //   ROS_INFO_STREAM("const_mol_self_pring = " << const_mol_self_pring);
+
+    if (execution_ratio<lower_limit_repulsion)
+    {
+        const_mol_spring=execution_ratio*(1/lower_limit_repulsion);
+    }
+    else if (execution_ratio>upper_limit_repulsion)
+    {
+        const_mol_spring=(1-execution_ratio)*(1/(1-upper_limit_repulsion));
+    }
+    else
+    {
+        const_mol_spring=1;
+    }
+
+//    ROS_INFO_STREAM("const_mol_spring = " << const_mol_spring << std::endl << "  " );
+
 
     joint_states=js_sub.getData();
     if (!name_sorting::permutationName(chain->getMoveableJointNames(),
@@ -364,13 +449,10 @@ int main(int argc, char **argv)
       Eigen::Vector6d twist_on_lnom_in_b=chain->getTwistLink(q_nom,Dq_nom,link_name); // twist (vel lin, vel rot) del link lnom visto nel frame b
 
       // cwise è l'equivalente di .* in matlab
-      Eigen::Vector3d self_elastic_force_on_l_in_b=self_spring.cwiseProduct(o_lnom_in_b-o_l_in_b);
+      Eigen::Vector3d self_elastic_force_on_l_in_b=const_mol_self_pring*self_spring.cwiseProduct(o_lnom_in_b-o_l_in_b);
 
       // implementa forze damping
-      Eigen::Vector3d self_damping_force_on_l_in_b;
-      self_damping_force_on_l_in_b=self_damper.cwiseProduct(twist_on_lnom_in_b.head(3)-twist_on_l_in_b.head(3));
-
-
+      Eigen::Vector3d self_damping_force_on_l_in_b=const_mol_self_pring*self_damper.cwiseProduct(twist_on_lnom_in_b.head(3)-twist_on_l_in_b.head(3));
 
       Eigen::Vector3d elastic_force_on_l_in_b;
       elastic_force_on_l_in_b.setZero();
@@ -380,20 +462,24 @@ int main(int argc, char **argv)
       if (activation_distance>0)
       {
         double min_distance=std::numeric_limits<double>::infinity();
+        min_distance=15;
         for (const Eigen::Vector3d& human_point_in_b: human_points_in_b)
         {
           // implementa forze repulsive e sommale
           double distance=(human_point_in_b-o_l_in_b).norm();
+           ROS_DEBUG_THROTTLE(0.1,"distance between human and %s: %f",link_name.c_str(),distance);
           if (distance<min_distance)
             min_distance=distance;
           if (distance<activation_distance)
           {
             Eigen::Vector3d versor=(human_point_in_b-o_l_in_b).normalized();
             // esempio=controllare segni e modificare nel caso
-            elastic_force_on_l_in_b+=spring.cwiseProduct(versor*(distance-activation_distance));
+            elastic_force_on_l_in_b+=const_mol_spring*spring.cwiseProduct(versor*(distance-activation_distance));
           }
         }
-        ROS_DEBUG_THROTTLE(0.1,"minimum distance between human and %s: %f",link_name.c_str(),min_distance);
+        distance_hr.data=min_distance;
+        dist_pub.publish(distance_hr);
+        ROS_DEBUG_THROTTLE(0.1,"minimum distance between human and %s: %f. human points: %zu",link_name.c_str(),min_distance,human_points_in_b.size());
       }
 
       Eigen::Vector3d force_on_l_in_b=self_elastic_force_on_l_in_b+self_damping_force_on_l_in_b+
@@ -412,11 +498,8 @@ int main(int argc, char **argv)
 
       joint_torque+=joint_torque_due_to_l;
     }
-
-    joint_torque+=joint_spring.cwiseProduct(q_nom-q_target);
-    joint_torque+=joint_damper.cwiseProduct(Dq_nom-Dq_target);
-
-
+    joint_torque+=const_mol_self_pring*joint_spring.cwiseProduct(q_nom-q_target);
+    joint_torque+=const_mol_self_pring*joint_damper.cwiseProduct(Dq_nom-Dq_target);
 
     // coppie = B(q)*DDq+nl(q,Dq)
     // dove nl contiene le coppie di Coriolis e dovute alla gravità
@@ -436,12 +519,12 @@ int main(int argc, char **argv)
     for (unsigned int idx=0;idx<chain->getActiveJointsNumber();idx++)
     {
 
+//      double deformation_ratio=1-2*std::abs(0.5-execution_ratio); //deforma fino al limite se execution ratio=0.5, non deforma se execution ratio=0 oppure =1
+//      double q_max=std::min(q_nom(idx)+deformation_ratio*max_deflection(idx),upper_limit(idx));
+//      double q_min=std::max(q_nom(idx)-deformation_ratio*max_deflection(idx),lower_limit(idx));
 
-
-      double deformation_ratio=1-2*std::abs(0.5-execution_ratio); //deforma fino al limite se execution ratio=0.5, non deforma se execution ratio=0 oppure =1
-      double q_max=std::min(q_nom(idx)+deformation_ratio*max_deflection(idx),upper_limit(idx));
-      double q_min=std::max(q_nom(idx)-deformation_ratio*max_deflection(idx),lower_limit(idx));
-
+      double q_max=std::min(q_nom(idx)+max_deflection(idx),upper_limit(idx));
+      double q_min=std::max(q_nom(idx)-max_deflection(idx),lower_limit(idx));
 
       // computing breacking distance
       double t_break=std::abs(Dq_target(idx))/DDq_max(idx);
