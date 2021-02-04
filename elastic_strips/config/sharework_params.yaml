@@ -3,7 +3,7 @@ tool_frame: open_tip
 
 tool0:
   # molle di "repulsione"
-  spring: [0.01,0.01,0.01]
+  spring: [0.1,0.1,0.1]
   damper: [0.001,0.001,0.001]
   activation_distance: 1 #metri
   #molle di "attrazione"
@@ -12,7 +12,7 @@ tool0:
 
 shoulder_link:
   # molle di "repulsione"
-  spring: [0.01,0.01,0.01]
+  spring: [0.1,0.1,o.1]
   damper: [0.001,0.001,0.001]
   activation_distance: 1 #metri
   #molle di "attrazione"
@@ -21,7 +21,7 @@ shoulder_link:
 
 upper_arm_link:
   # molle di "repulsione"
-  spring: [0.0105,0.0105,0.0105]
+  spring: [0.1,0.1,0.1]
   damper: [0.001,0.001,0.001]
   activation_distance: 1 #metri
   #molle di "attrazione"
@@ -30,7 +30,7 @@ upper_arm_link:
 
 forearm_link:
   # molle di "repulsione"
-  spring: [0.011,0.011,0.011]
+  spring: [0.11,0.11,0.11]
   damper: [0.001,0.001,0.001]
   activation_distance: 1 #metri
   #molle di "attrazione"
@@ -39,7 +39,7 @@ forearm_link:
 
 wrist_1_link:
   # molle di "repulsione"
-  spring: [0.0115,0.0115,0.0115]
+  spring: [0.13,0.13,0.13]
   damper: [0.001,0.001,0.001]
   activation_distance: 1 #metri
   #molle di "attrazione"
@@ -48,7 +48,7 @@ wrist_1_link:
 
 wrist_2_link:
   # molle di "repulsione"
-  spring: [0.012,0.012,0.012]
+  spring: [0.14,0.14,0.14]
   damper: [0.001,0.001,0.001]
   activation_distance: 1 #metri
   #molle di "attrazione"
@@ -57,7 +57,7 @@ wrist_2_link:
 
 wrist_3_link:
   # molle di "repulsione"
-  spring: [0.0125,0.0125,0.0125]
+  spring: [0.15,0.15,0.15]
   damper: [0.001,0.001,0.001]
   activation_distance: 1 #metri
   #molle di "attrazione"
@@ -66,7 +66,8 @@ wrist_3_link:
 
 ee_link:
   # molle di "repulsione"
-  spring: [0.013,0.013,0.013]
+  # spring: [0.16,0.16,0.16]
+  spring: [0.8,0.8,0.8]
   damper: [0.001,0.001,0.001]
   activation_distance: 1 #metri
   #molle di "attrazione"
@@ -74,9 +75,9 @@ ee_link:
   self_damper: [0.001,0.001,0.001]
 
 joint_spring: [1.2,1.2,1.2,0.12,0.12,0.12]
-joint_damper: [1.6,1.6,1.6,0.4,0.4,0.4]
+joint_damper: [1.4,1.4,1.4,0.3,0.3,0.3]
 
-max_joint_deflaction: [0.05,0.1,0.15,0.2,0.25,0.3] #[1,1,1,1,1,1] 
+max_joint_deflaction: [0.1,0.12,0.15,0.2,0.25,0.3] #[1,1,1,1,1,1]
 
 max_reduction: 0.5
 upper_limit_repulsion: 1.0 #0.9
