@@ -152,6 +152,13 @@ int main(int argc, char **argv)
   Dq_target=Dq;
   DDq_target.setZero();
 
+  Eigen::VectorXd q_distance(chain->getActiveJointsNumber()); //posizione relativa
+  Eigen::VectorXd Dq_distance(chain->getActiveJointsNumber()); // velocità relativa
+  Eigen::VectorXd DDq_distance(chain->getActiveJointsNumber()); // accelerazione target
+
+  q_distance.setZero();
+  Dq_distance.setZero();
+  DDq_distance.setZero();
 
   std::vector<std::string> link_names=chain->getLinksName();
 
@@ -307,6 +314,10 @@ int main(int argc, char **argv)
   sensor_msgs::JointState joint_target;
   joint_target=joint_states;
 
+  ros::Publisher jd_pub=nh.advertise<sensor_msgs::JointState>("/manipulator/joint_distance",1);
+  sensor_msgs::JointState joint_distance;
+  joint_distance=joint_states;
+
 
   ros::Publisher dist_pub=nh.advertise<std_msgs::Float64>("/distance_human_robot",1);
   std_msgs::Float64 distance_hr;
@@ -404,8 +415,6 @@ int main(int argc, char **argv)
         Dq_nom(idx)=joint_setpoint.velocity.at(idx);
       }
     }
-
-
 
     if (poses_sub.isANewDataAvailable())
     {
@@ -515,14 +524,15 @@ int main(int argc, char **argv)
 
     // dinamica diretta
     DDq_target=joint_inertia.inverse()*(joint_torque-nl);
+    DDq_distance=joint_inertia.inverse()*(joint_torque-nl);
+
+   // q_distance=q_target-q_nom;
+   // Dq_distance=Dq_target-Dq_nom;
+   // q_distance.setZero();
+   // Dq_distance.setZero();
 
     for (unsigned int idx=0;idx<chain->getActiveJointsNumber();idx++)
     {
-
-//      double deformation_ratio=1-2*std::abs(0.5-execution_ratio); //deforma fino al limite se execution ratio=0.5, non deforma se execution ratio=0 oppure =1
-//      double q_max=std::min(q_nom(idx)+deformation_ratio*max_deflection(idx),upper_limit(idx));
-//      double q_min=std::max(q_nom(idx)-deformation_ratio*max_deflection(idx),lower_limit(idx));
-
       double q_max=std::min(q_nom(idx)+max_deflection(idx),upper_limit(idx));
       double q_min=std::max(q_nom(idx)-max_deflection(idx),lower_limit(idx));
 
@@ -530,23 +540,12 @@ int main(int argc, char **argv)
       double t_break=std::abs(Dq_target(idx))/DDq_max(idx);
       double breaking_distance=0.5*DDq_max(idx)*std::pow(t_break,2.0);
 
-      if (Dq_target(idx)>Dq_max(idx))
-        Dq_target(idx)=Dq_max(idx);
-      else if (Dq_target(idx)<-Dq_max(idx))
-          Dq_target(idx)=-Dq_max(idx);
-
-      if (std::abs(q_max-q_min)<0.5*DDq_max(idx)*std::pow(st,2.0)) // se l'upper e il lower bound sono molto vicini sequi traiettoria nominale
-      {
-        q_target(idx)=q_nom(idx);
-        Dq_target(idx)=Dq_nom(idx);
-        DDq_target(idx)=0;
-      }
-      else if (q_target(idx) >= (q_max-breaking_distance)) // frena per non superare upper bound
+      if (q_target(idx) >= (q_max-breaking_distance)) // frena per non superare upper bound
       {
         if (Dq_target(idx)>0)
         {
           ROS_WARN_THROTTLE(2,"Breaking, maximum limit approaching on joint %u",idx);
-          DDq_target(idx)=-DDq_max(idx);
+          DDq_distance(idx)=-DDq_max(idx);
         }
       }
       else if (q_target(idx) <= (q_min + breaking_distance)) // frena per non superare loew bound
@@ -554,19 +553,33 @@ int main(int argc, char **argv)
         if (Dq_target(idx) < 0)
         {
           ROS_WARN_THROTTLE(2,"Breaking, minimum limit approaching on joint %u",idx);
-          DDq_target(idx)=+DDq_max(idx);
+          DDq_distance(idx)=+DDq_max(idx);
         }
       }
 
-      q_target(idx)+=Dq_target(idx)*st+0.5*DDq_target(idx)*std::pow(st,2);
-      Dq_target(idx)+=DDq_target(idx)*st;
+      q_distance(idx)+=Dq_distance(idx)*st+0.5*DDq_distance(idx)*std::pow(st,2);
+      Dq_distance(idx)+=DDq_distance(idx)*st;
+
+      q_target(idx)=q_nom(idx)+q_distance(idx);
+      Dq_target(idx)=Dq_nom(idx)+Dq_distance(idx);
+
+      if (Dq_target(idx)>Dq_max(idx))
+        Dq_target(idx)=Dq_max(idx);
+      else if (Dq_target(idx)<-Dq_max(idx))
+        Dq_target(idx)=-Dq_max(idx);
+
+      joint_distance.position.at(idx)=q_distance(idx);
+      joint_distance.velocity.at(idx)=Dq_distance(idx);
 
       joint_target.position.at(idx)=q_target(idx);
       joint_target.velocity.at(idx)=Dq_target(idx);
     }
-    joint_target.header.stamp=ros::Time::now(); // aggiorno tempo messaggio (per log, print)
 
+    joint_target.header.stamp=ros::Time::now(); // aggiorno tempo messaggio (per log, print)
     jt_pub.publish(joint_target);
+
+    joint_distance.header.stamp=ros::Time::now();
+    jd_pub.publish(joint_distance);
 
     rate.sleep();
   }

@@ -3,76 +3,83 @@ tool_frame: open_tip
 
 tool0:
   # molle di "repulsione"
-  spring: [0.1,0.1,0.1]
+  spring: [0.01,0.01,0.01]
+  # spring: [0.1,0.1,0.1]
   damper: [0.001,0.001,0.001]
   activation_distance: 1 #metri
   #molle di "attrazione"
-  self_spring: [11,11,11]
-  self_damper: [0.001,0.001,0.001]
+  self_spring: [0.11,0.11,0.11] #[11,11,11]
+  self_damper: [0.01,0.01,0.01]
 
 shoulder_link:
   # molle di "repulsione"
-  spring: [0.1,0.1,o.1]
+  spring: [0.01,0.01,0.01]
+  # spring: [0.1,0.1,0.1]
   damper: [0.001,0.001,0.001]
   activation_distance: 1 #metri
   #molle di "attrazione"
-  self_spring: [11,11,11]
-  self_damper: [0.001,0.001,0.001]
+  self_spring: [0.11,0.11,0.11] #[11,11,11]
+  self_damper: [0.01,0.01,0.01]
 
 upper_arm_link:
   # molle di "repulsione"
-  spring: [0.1,0.1,0.1]
+  spring: [0.01,0.01,0.01]
+  # spring: [0.1,0.1,0.1]
   damper: [0.001,0.001,0.001]
   activation_distance: 1 #metri
   #molle di "attrazione"
-  self_spring: [10.75,10.75,10.75]
-  self_damper: [0.001,0.001,0.001]
+  self_spring: [0.11,0.11,0.11] #[10.75,10.75,10.75]
+  self_damper: [0.01,0.01,0.01]
 
 forearm_link:
   # molle di "repulsione"
-  spring: [0.11,0.11,0.11]
+  spring: [0.011,0.011,0.011]
+  # spring: [0.11,0.11,0.11]
   damper: [0.001,0.001,0.001]
   activation_distance: 1 #metri
   #molle di "attrazione"
-  self_spring: [10.5,10.5,10.5]
-  self_damper: [0.001,0.001,0.001]
+  self_spring: [0.11,0.11,0.11] #[10.5,10.5,10.5]
+  self_damper: [0.01,0.01,0.01]
 
 wrist_1_link:
   # molle di "repulsione"
-  spring: [0.13,0.13,0.13]
+  spring: [0.013,0.013,0.013]
+  # spring: [0.13,0.13,0.13]
   damper: [0.001,0.001,0.001]
   activation_distance: 1 #metri
   #molle di "attrazione"
-  self_spring: [10.25,10.25,10.25]
-  self_damper: [0.001,0.001,0.001]
+  self_spring: [0.11,0.11,0.11] #[10.25,10.25,10.25]
+  self_damper: [0.01,0.01,0.01]
 
 wrist_2_link:
   # molle di "repulsione"
-  spring: [0.14,0.14,0.14]
+  spring: [0.014,0.014,0.014]
+  # spring: [0.14,0.14,0.14]
   damper: [0.001,0.001,0.001]
   activation_distance: 1 #metri
   #molle di "attrazione"
-  self_spring: [10,10,10]
-  self_damper: [0.001,0.001,0.001]
+  self_spring: [0.11,0.11,0.11] #[10,10,10]
+  self_damper: [0.01,0.01,0.01]
 
 wrist_3_link:
   # molle di "repulsione"
-  spring: [0.15,0.15,0.15]
+  spring: [0.015,0.015,0.015]
+  # spring: [0.15,0.15,0.15]
   damper: [0.001,0.001,0.001]
   activation_distance: 1 #metri
   #molle di "attrazione"
-  self_spring: [9.75,9.75,9.75]
-  self_damper: [0.001,0.001,0.001]
+  self_spring: [0.11,0.11,0.11] #[9.75,9.75,9.75]
+  self_damper: [0.01,0.01,0.01]
 
 ee_link:
   # molle di "repulsione"
-  # spring: [0.16,0.16,0.16]
-  spring: [0.8,0.8,0.8]
+  spring: [0.016,0.016,0.016]
+  # spring: [0.8,0.8,0.8]
   damper: [0.001,0.001,0.001]
   activation_distance: 1 #metri
   #molle di "attrazione"
-  self_spring: [9.5,9.5,9.5]
-  self_damper: [0.001,0.001,0.001]
+  self_spring: [0.11,0.11,0.11] #[9.5,9.5,9.5]
+  self_damper: [0.01,0.01,0.01]
 
 joint_spring: [1.2,1.2,1.2,0.12,0.12,0.12]
 joint_damper: [1.4,1.4,1.4,0.3,0.3,0.3]
