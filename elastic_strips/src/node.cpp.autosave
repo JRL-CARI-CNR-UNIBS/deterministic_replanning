@@ -389,7 +389,7 @@ int main(int argc, char **argv)
     if (const_mol_self_pring>1.0)
       const_mol_self_pring=1.0;
     else if (const_mol_self_pring<max_reduction)
-      const_mol_self_pring=max_reduction;
+      const_mol_self_pring=max_reduction; 
 
  //   ROS_INFO_STREAM("const_mol_self_pring = " << const_mol_self_pring);
 
