@@ -145,12 +145,12 @@ int main(int argc, char **argv)
   // target (setpoint anello di posizione del robot)
   Eigen::VectorXd q_target(chain->getActiveJointsNumber()); //posizione target
   Eigen::VectorXd Dq_target(chain->getActiveJointsNumber()); // velocità target
-  Eigen::VectorXd DDq_target(chain->getActiveJointsNumber()); // accelerazione target
+  // Eigen::VectorXd DDq_target(chain->getActiveJointsNumber()); // accelerazione target
   Eigen::VectorXd joint_torque(chain->getActiveJointsNumber()); // coppie
 
   q_target=q;
   Dq_target=Dq;
-  DDq_target.setZero();
+  // DDq_target.setZero();
 
   Eigen::VectorXd q_distance(chain->getActiveJointsNumber()); //posizione relativa
   Eigen::VectorXd Dq_distance(chain->getActiveJointsNumber()); // velocità relativa
@@ -159,6 +159,18 @@ int main(int argc, char **argv)
   q_distance.setZero();
   Dq_distance.setZero();
   DDq_distance.setZero();
+
+  // creo le variabili ausiliarie di q_distance e q_target
+  Eigen::VectorXd q_target_test(chain->getActiveJointsNumber()); //posizione target
+  Eigen::VectorXd Dq_target_test(chain->getActiveJointsNumber()); // velocità target
+  Eigen::VectorXd q_distance_test(chain->getActiveJointsNumber()); //posizione relativa
+  Eigen::VectorXd Dq_distance_test(chain->getActiveJointsNumber()); // velocità relativa
+
+  q_target_test.setZero();
+  Dq_target_test.setZero();
+  q_distance_test.setZero();
+  Dq_distance_test.setZero();
+
 
   std::vector<std::string> link_names=chain->getLinksName();
 
@@ -523,7 +535,7 @@ int main(int argc, char **argv)
     joint_torque+=grav_torque;
 
     // dinamica diretta
-    DDq_target=joint_inertia.inverse()*(joint_torque-nl);
+    // DDq_target=joint_inertia.inverse()*(joint_torque-nl);
     DDq_distance=joint_inertia.inverse()*(joint_torque-nl);
 
    // q_distance=q_target-q_nom;
@@ -540,17 +552,23 @@ int main(int argc, char **argv)
       double t_break=std::abs(Dq_target(idx))/DDq_max(idx);
       double breaking_distance=0.5*DDq_max(idx)*std::pow(t_break,2.0);
 
-      if (q_target(idx) >= (q_max-breaking_distance)) // frena per non superare upper bound
+      q_distance_test(idx)=q_distance(idx)+Dq_distance(idx)*st+0.5*DDq_distance(idx)*std::pow(st,2);
+      Dq_distance_test(idx)=Dq_distance(idx)+DDq_distance(idx)*st;
+
+      q_target_test(idx)=q_nom(idx)+q_distance_test(idx);
+      Dq_target_test(idx)=Dq_nom(idx)+Dq_distance_test(idx);
+
+      if (q_target_test(idx) >= (q_max-breaking_distance)) // frena per non superare upper bound
       {
-        if (Dq_target(idx)>0)
+        if (Dq_target_test(idx)>0)
         {
           ROS_WARN_THROTTLE(2,"Breaking, maximum limit approaching on joint %u",idx);
           DDq_distance(idx)=-DDq_max(idx);
         }
       }
-      else if (q_target(idx) <= (q_min + breaking_distance)) // frena per non superare loew bound
+      else if (q_target_test(idx) <= (q_min + breaking_distance)) // frena per non superare loew bound
       {
-        if (Dq_target(idx) < 0)
+        if (Dq_target_test(idx) < 0)
         {
           ROS_WARN_THROTTLE(2,"Breaking, minimum limit approaching on joint %u",idx);
           DDq_distance(idx)=+DDq_max(idx);
