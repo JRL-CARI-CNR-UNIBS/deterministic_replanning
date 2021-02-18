@@ -1,0 +1,76 @@
+start_log: true
+
+binary_logger:
+  num_worker_threads: 10
+  # test_path: is the path where the binary file will be saved (if empty the destination directory will be '/home/user/.ros' )
+  test_path: ""
+
+  test_name: "test_elastic"
+
+
+  # manager_name: name of the nodlet manager (need to be equal to the name in the launch file)
+  manager_name: 'binary_logger'
+
+  # list of nodelet (unrelated to binary_logger package) that the user do not want to stop
+  unstoppable_nodelets: []
+
+  # Type of the topic that need to be logged (supported JointState, Imu, PoseStamped, WrenchStamped, Float64MultiArray)
+  topic_type:
+  - 'JointState'
+  - 'Float64'
+#  - 'Int64'
+
+  JointState:
+    # List of the topic to be acquired
+    topic_names:
+    - '/manipulator/joint_states'
+    - '/manipulator/joint_target'
+    - '/strip/joint_target'
+    - '/manipulator/joint_distance'
+
+    # Acquisition time (to be specified for each topic)
+    duration:
+      - 1000 #[s]
+      - 1000 #[s]
+      - 1000 #[s]
+      - 1000 #[s]
+
+    # Message decimation (to be specified for each topic)
+    decimation:
+      - 1
+      - 1
+      - 1
+      - 1
+
+  Float64:
+    # List of the topic to be acquired
+    topic_names:
+    - '/distance_human_robot'
+    - '/const_molt_self_spring'
+    - '/const_molt_spring'
+
+    # Acquisition time (to be specified for each topic)
+    duration:
+      - 1000 #[s]
+      - 1000 #[s]
+      - 1000 #[s]
+
+# Message decimation (to be specified for each topic)
+    decimation:
+      - 1
+      - 1
+      - 1
+
+#  Int64:
+    # List of the topic to be acquired
+#    topic_names:
+#    - '/safe_ovr_1'
+
+    # Acquisition time (to be specified for each topic)
+#    duration:
+#      - 1000 #[s]
+
+    # Message decimation (to be specified for each topic)
+#    decimation:
+#      - 1
+

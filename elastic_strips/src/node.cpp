@@ -330,11 +330,17 @@ int main(int argc, char **argv)
   sensor_msgs::JointState joint_distance;
   joint_distance=joint_states;
 
-
   ros::Publisher dist_pub=nh.advertise<std_msgs::Float64>("/distance_human_robot",1);
   std_msgs::Float64 distance_hr;
   distance_hr.data=100;
 
+  ros::Publisher c_m_s_s_pub=nh.advertise<std_msgs::Float64>("/const_molt_self_spring",1);
+  std_msgs::Float64 c_m_s_s;
+  c_m_s_s.data=1;
+
+  ros::Publisher c_m_s_pub=nh.advertise<std_msgs::Float64>("/const_molt_spring",1);
+  std_msgs::Float64 c_m_s;
+  c_m_s.data=1;
 
   double st=2e-3;
   ros::Rate rate(1.0/st); // cicla a 2 ms
@@ -356,7 +362,7 @@ int main(int argc, char **argv)
     ros::spinOnce(); // ricevo i messaggi se ne è arrivato qualcuno
 
     double execution_ratio=ex_ratio_sub.getData().data; // std_msgs/Float64 ha un campo chiamato data che contiene il double
-    double const_mol_spring, const_mol_self_pring;
+    double const_mol_spring, const_mol_self_spring;
 
 //    ROS_INFO_STREAM("execution_ratio = " << execution_ratio);
 
@@ -364,32 +370,36 @@ int main(int argc, char **argv)
     {
       if (lower_limit_repulsion==0.0)
       {
-        const_mol_self_pring=max_reduction;
+        const_mol_self_spring=max_reduction;
       }
       else
       {
-        const_mol_self_pring=1.0+(max_reduction-1.0)*(execution_ratio/lower_limit_repulsion);
+        const_mol_self_spring=1.0+(max_reduction-1.0)*(execution_ratio/lower_limit_repulsion);
       }
     }
     else if (execution_ratio<upper_limit_repulsion)
     {
-      const_mol_self_pring=max_reduction;
+      const_mol_self_spring=max_reduction;
     }
     else
     {
       if (upper_limit_repulsion==1.0)
       {
-        const_mol_self_pring=max_reduction;
+        const_mol_self_spring=max_reduction;
       }
       else
       {
-        const_mol_self_pring=max_reduction+(1.0-max_reduction)*((execution_ratio-upper_limit_repulsion)/(1.0-upper_limit_repulsion));
+        const_mol_self_spring=max_reduction+(1.0-max_reduction)*((execution_ratio-upper_limit_repulsion)/(1.0-upper_limit_repulsion));
       }
     }
-    if (const_mol_self_pring>1.0)
-      const_mol_self_pring=1.0;
-    else if (const_mol_self_pring<max_reduction)
-      const_mol_self_pring=max_reduction;
+    if (const_mol_self_spring>1.0)
+      const_mol_self_spring=1.0;
+    else if (const_mol_self_spring<max_reduction)
+      const_mol_self_spring=max_reduction;
+
+    c_m_s_s.data=const_mol_self_spring;
+    c_m_s_s_pub.publish(c_m_s_s);
+
 
  //   ROS_INFO_STREAM("const_mol_self_pring = " << const_mol_self_pring);
 
@@ -405,6 +415,9 @@ int main(int argc, char **argv)
     {
         const_mol_spring=1;
     }
+
+    c_m_s.data=const_mol_spring;
+    c_m_s_pub.publish(c_m_s);
 
 //    ROS_INFO_STREAM("const_mol_spring = " << const_mol_spring << std::endl << "  " );
 
@@ -462,6 +475,9 @@ int main(int argc, char **argv)
 
     joint_torque.setZero();
 
+    double min_distance_tot=std::numeric_limits<double>::infinity();
+    min_distance_tot=15;
+
     for (const std::string& link_name: link_names)
     {
       Eigen::Vector3d spring=link_springs.at(link_name);
@@ -484,10 +500,10 @@ int main(int argc, char **argv)
       Eigen::Vector6d twist_on_lnom_in_b=chain->getTwistLink(q_nom,Dq_nom,link_name); // twist (vel lin, vel rot) del link lnom visto nel frame b
 
       // cwise è l'equivalente di .* in matlab
-      Eigen::Vector3d self_elastic_force_on_l_in_b=const_mol_self_pring*self_spring.cwiseProduct(o_lnom_in_b-o_l_in_b);
+      Eigen::Vector3d self_elastic_force_on_l_in_b=const_mol_self_spring*self_spring.cwiseProduct(o_lnom_in_b-o_l_in_b);
 
       // implementa forze damping
-      Eigen::Vector3d self_damping_force_on_l_in_b=const_mol_self_pring*self_damper.cwiseProduct(twist_on_lnom_in_b.head(3)-twist_on_l_in_b.head(3));
+      Eigen::Vector3d self_damping_force_on_l_in_b=const_mol_self_spring*self_damper.cwiseProduct(twist_on_lnom_in_b.head(3)-twist_on_l_in_b.head(3));
 
       Eigen::Vector3d elastic_force_on_l_in_b;
       elastic_force_on_l_in_b.setZero();
@@ -512,8 +528,9 @@ int main(int argc, char **argv)
             elastic_force_on_l_in_b+=const_mol_spring*spring.cwiseProduct(versor*(distance-activation_distance));
           }
         }
-        distance_hr.data=min_distance;
-        dist_pub.publish(distance_hr);
+        if (min_distance<min_distance_tot)
+          min_distance_tot=min_distance;
+
         ROS_DEBUG_THROTTLE(0.1,"minimum distance between human and %s: %f. human points: %zu",link_name.c_str(),min_distance,human_points_in_b.size());
       }
 
@@ -533,8 +550,12 @@ int main(int argc, char **argv)
 
       joint_torque+=joint_torque_due_to_l;
     }
-    joint_torque+=const_mol_self_pring*joint_spring.cwiseProduct(q_nom-q_target);
-    joint_torque+=const_mol_self_pring*joint_damper.cwiseProduct(Dq_nom-Dq_target);
+
+    distance_hr.data=min_distance_tot;
+    dist_pub.publish(distance_hr);
+
+    joint_torque+=const_mol_self_spring*joint_spring.cwiseProduct(q_nom-q_target);
+    joint_torque+=const_mol_self_spring*joint_damper.cwiseProduct(Dq_nom-Dq_target);
 
     // coppie = B(q)*DDq+nl(q,Dq)
     // dove nl contiene le coppie di Coriolis e dovute alla gravità
