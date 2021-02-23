@@ -1,5 +1,5 @@
 <launch>
   <rosparam command="load" file="$(find elastic_strips)/config/binary_logger_elastic.yaml" />
   <node pkg="nodelet" type="nodelet" name="binary_logger"  args="manager" output="screen"/>
-  <node pkg="binary_logger" type="logger_start" name="logger_start" output="screen"/>
+  <node pkg="binary_logger" type="automatic_logger_node" name="automatic_logger_node" output="screen"/>
 </launch>
