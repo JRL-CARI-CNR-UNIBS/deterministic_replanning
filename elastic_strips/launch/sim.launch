@@ -31,13 +31,12 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 -->
 
 <launch>
-<arg name="log_name" default="test"/>
-<include file="$(find elastic_strips)/launch/binary_logger_elastic.launch"/>
-<include file="$(find sharework_cembre_configurations)/launch/execute_trj.launch">
-  <arg name="trj" value="test_move3"/>
+
+<include file="$(find elastic_strips)/launch/execute_trj.launch">
+  <arg name="trj" value="not_linear_trj"/>
 </include>
-<node name="bag" pkg="rosbag" type="play" output="screen" args="$(find elastic_strips)/data/data_persona/registazione6_2021-02-18-16-50-55.bag"/>
 
+<node name="bag" pkg="rosbag" type="play" output="screen" args="$(find elastic_strips)/data/data_persona/registrazioneee_2021-03-01-15-27-02.bag"/>
+<!-- registrazione7_2021-02-23-16-32-37.bag           registrazione8_2021-02-23-16-35-04.bag   registrazioneee_2021-03-01-15-27-02.bag -->
 
-<param name="/binary_logger/log_name" type="string" value="$(arg log_name)" />
 </launch>

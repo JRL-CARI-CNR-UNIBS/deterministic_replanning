@@ -160,6 +160,26 @@ int main(int argc, char **argv)
   Dq_distance.setZero();
   DDq_distance.setZero();
 
+  if (jt_sub.isANewDataAvailable())
+  {
+    sensor_msgs::JointState joint_setpoint=jt_sub.getData();
+    if (!name_sorting::permutationName(chain->getMoveableJointNames(),
+                                      joint_setpoint.name,
+                                      joint_setpoint.position,
+                                      joint_setpoint.velocity))
+    {
+      ROS_ERROR("some joints are missing");
+      return 0;
+    }
+    for (unsigned int idx=0;idx<chain->getActiveJointsNumber();idx++)
+    {
+      q_nom(idx)=joint_setpoint.position.at(idx); // notare la differenza nell'accedere all'elemento in Eigen::VectorXd e std::vector
+      Dq_nom(idx)=joint_setpoint.velocity.at(idx);
+      q_distance(idx)=q_target(idx)-q_nom(idx);
+      Dq_distance(idx)=Dq_target(idx)-Dq_nom(idx);
+    }
+  }
+
   // creo le variabili ausiliarie di q_distance e q_target
   Eigen::VectorXd q_target_test(chain->getActiveJointsNumber()); //posizione target
   Eigen::VectorXd Dq_target_test(chain->getActiveJointsNumber()); // velocità target
@@ -226,7 +246,7 @@ int main(int argc, char **argv)
     Eigen::Vector3d self_spring, self_damper;
     std::vector<double> self_spring_vec, self_damper_vec; // per caricare un vettore da param bisogna caricare un std::vector e poi convertirlo in Eigen::Vector
 
-    if ((!nh.getParam(link_name+"/self_spring",self_spring_vec)) || (!nh.getParam(link_name+"/damper",self_damper_vec)))
+    if ((!nh.getParam(link_name+"/self_spring",self_spring_vec)) || (!nh.getParam(link_name+"/self_damper",self_damper_vec)))
     {
       // non è definita una molla e uno smorzatore per questo link
       self_spring.setZero();
@@ -317,6 +337,72 @@ int main(int argc, char **argv)
     ROS_INFO_STREAM("lower_limit_repulsion = " << lower_limit_repulsion);
   }
 
+  double molt_cms;
+  if (!nh.getParam("molt_cms",molt_cms))
+  {
+    ROS_INFO("molt_cms is not defined. set equal to 1");
+    molt_cms=1.0;
+  }
+  else
+  {
+    ROS_INFO_STREAM("molt_cms = " << molt_cms);
+  }
+
+  double molt_cmssj;
+  if (!nh.getParam("molt_cmssj",molt_cmssj))
+  {
+    ROS_INFO("molt_cmssj is not defined. set equal to 1");
+    molt_cmssj=1.0;
+  }
+  else
+  {
+    ROS_INFO_STREAM("molt_cmssj = " << molt_cmssj);
+  }
+
+  double molt_cmssg;
+  if (!nh.getParam("molt_cmssg",molt_cmssg))
+  {
+    ROS_INFO("molt_cmssg is not defined. set equal to 1");
+    molt_cmssg=1.0;
+  }
+  else
+  {
+    ROS_INFO_STREAM("molt_cmssg = " << molt_cmssg);
+  }
+
+  double molt_cmsdg;
+  if (!nh.getParam("molt_cmsdg",molt_cmsdg))
+  {
+    ROS_INFO("molt_cmsdg is not defined. set equal to 1");
+    molt_cmsdg=1.0;
+  }
+  else
+  {
+    ROS_INFO_STREAM("molt_cmsdg = " << molt_cmsdg);
+  }
+
+  double molt_cmsdj;
+  if (!nh.getParam("molt_cmsdj",molt_cmsdj))
+  {
+    ROS_INFO("molt_cmsdj is not defined. set equal to 1");
+    molt_cmsdj=1.0;
+  }
+  else
+  {
+    ROS_INFO_STREAM("molt_cmsdj = " << molt_cmsdj);
+  }
+
+  bool restart_elasticity;
+  if (!nh.getParam("restart_elasticity",restart_elasticity))
+  {
+    ROS_INFO("restart_elasticity is not defined. set equal to false");
+    restart_elasticity=false;
+  }
+  else
+  {
+    ROS_INFO_STREAM("restart_elasticity = " << restart_elasticity);
+  }
+
   Eigen::VectorXd upper_limit=chain->getQMax();
   Eigen::VectorXd lower_limit=chain->getQMin();
   Eigen::VectorXd Dq_max=chain->getDQMax();
@@ -342,6 +428,18 @@ int main(int argc, char **argv)
   std_msgs::Float64 c_m_s;
   c_m_s.data=1;
 
+  ros::Publisher pose_end_x_pub=nh.advertise<std_msgs::Float64>("/pose_end_x",1);
+  std_msgs::Float64 pose_end_x;
+  pose_end_x.data=0;
+
+  ros::Publisher pose_end_y_pub=nh.advertise<std_msgs::Float64>("/pose_end_y",1);
+  std_msgs::Float64 pose_end_y;
+  pose_end_y.data=0;
+
+  ros::Publisher pose_end_z_pub=nh.advertise<std_msgs::Float64>("/pose_end_z",1);
+  std_msgs::Float64 pose_end_z;
+  pose_end_z.data=0;
+  
   double st=2e-3;
   ros::Rate rate(1.0/st); // cicla a 2 ms
 
@@ -351,18 +449,113 @@ int main(int argc, char **argv)
 
 
 
-
-
-
+  ros::Time tparam=ros::Time::now();
 
 
   while (ros::ok())
   {
 
+    if ((ros::Time::now()-tparam).toSec()>1.0)
+    {
+        tparam=ros::Time::now();
+
+        if (!nh.getParam("max_reduction",max_reduction))
+        {
+          ROS_INFO("max_reduction is not defined. set equal to 1");
+          max_reduction=1.0;
+        }
+        else
+        {
+          ROS_INFO_STREAM("max_reduction = " << max_reduction);
+        }
+
+        if (!nh.getParam("upper_limit_repulsion",upper_limit_repulsion))
+        {
+          ROS_INFO("upper_limit_repulsion is not defined. set equal to 1");
+          upper_limit_repulsion=1.0;
+        }
+        else
+        {
+          ROS_INFO_STREAM("upper_limit_repulsion = " << upper_limit_repulsion);
+        }
+
+        if (!nh.getParam("lower_limit_repulsion",lower_limit_repulsion))
+        {
+          ROS_INFO("lower_limit_repulsion is not defined. set equal to 0");
+          lower_limit_repulsion=0.0;
+        }
+        else
+        {
+          ROS_INFO_STREAM("lower_limit_repulsion = " << lower_limit_repulsion);
+        }
+
+        if (!nh.getParam("molt_cms",molt_cms))
+        {
+          ROS_INFO("molt_cms is not defined. set equal to 1");
+          molt_cms=1.0;
+        }
+        else
+        {
+          ROS_INFO_STREAM("molt_cms = " << molt_cms);
+        }
+
+        if (!nh.getParam("molt_cmssj",molt_cmssj))
+        {
+          ROS_INFO("molt_cmssj is not defined. set equal to 1");
+          molt_cmssj=1.0;
+        }
+        else
+        {
+          ROS_INFO_STREAM("molt_cmssj = " << molt_cmssj);
+        }
+
+        if (!nh.getParam("molt_cmssg",molt_cmssg))
+        {
+          ROS_INFO("molt_cmssg is not defined. set equal to 1");
+          molt_cmssg=1.0;
+        }
+        else
+        {
+          ROS_INFO_STREAM("molt_cmssg = " << molt_cmssg);
+        }
+
+        if (!nh.getParam("molt_cmsdg",molt_cmsdg))
+        {
+          ROS_INFO("molt_cmsdg is not defined. set equal to 1");
+          molt_cmsdg=1.0;
+        }
+        else
+        {
+          ROS_INFO_STREAM("molt_cmsdg = " << molt_cmsdg);
+        }
+
+        if (!nh.getParam("molt_cmsdj",molt_cmsdj))
+        {
+          ROS_INFO("molt_cmsdj is not defined. set equal to 1");
+          molt_cmsdj=1.0;
+        }
+        else
+        {
+          ROS_INFO_STREAM("molt_cmsdj = " << molt_cmsdj);
+        }
+        if (!nh.getParam("restart_elasticity",restart_elasticity))
+        {
+          ROS_INFO("restart_elasticity is not defined. set equal to false");
+          restart_elasticity=false;
+        }
+        else
+        {
+          ROS_INFO_STREAM("restart_elasticity = " << restart_elasticity);
+        }
+
+       // legge reset
+       // set param reset false
+       //   nh.setParam("ddddd",false);
+    }
     ros::spinOnce(); // ricevo i messaggi se ne è arrivato qualcuno
 
     double execution_ratio=ex_ratio_sub.getData().data; // std_msgs/Float64 ha un campo chiamato data che contiene il double
-    double const_mol_spring, const_mol_self_spring;
+    double const_mol_spring, const_mol_self_spring,const_mol_self_spring_geom,const_mol_self_spring_joint,const_mol_self_damper_geom,const_mol_self_damper_joint;
 
 //    ROS_INFO_STREAM("execution_ratio = " << execution_ratio);
 
@@ -400,6 +593,10 @@ int main(int argc, char **argv)
     c_m_s_s.data=const_mol_self_spring;
     c_m_s_s_pub.publish(c_m_s_s);
 
+    const_mol_self_spring_geom=const_mol_self_spring*molt_cmssg;
+    const_mol_self_spring_joint=const_mol_self_spring*molt_cmssj;
+    const_mol_self_damper_geom=const_mol_self_spring*molt_cmsdg;
+    const_mol_self_damper_joint=const_mol_self_spring*molt_cmsdj;
 
  //   ROS_INFO_STREAM("const_mol_self_pring = " << const_mol_self_pring);
 
@@ -418,6 +615,8 @@ int main(int argc, char **argv)
 
     c_m_s.data=const_mol_spring;
     c_m_s_pub.publish(c_m_s);
+
+    const_mol_spring=const_mol_spring*molt_cms;
 
 //    ROS_INFO_STREAM("const_mol_spring = " << const_mol_spring << std::endl << "  " );
 
@@ -479,7 +678,7 @@ int main(int argc, char **argv)
     min_distance_tot=15;
 
     for (const std::string& link_name: link_names)
-    {
+    { 
       Eigen::Vector3d spring=link_springs.at(link_name);
       Eigen::Vector3d damper=link_dampers.at(link_name);
       double activation_distance=link_activation_distances.at(link_name);
@@ -494,16 +693,26 @@ int main(int argc, char **argv)
       Eigen::Vector3d o_l_in_b=T_b_l.translation(); // origine di l vista in b
       Eigen::Vector6d twist_on_l_in_b=chain->getTwistLink(q_target,Dq_target,link_name); // twist (vel lin, vel rot) del link l visto nel frame b
 
+      if (link_name=="wrist_3_link")
+      {
+          pose_end_x.data=o_l_in_b(1);
+          pose_end_y.data=o_l_in_b(2);
+          pose_end_z.data=o_l_in_b(3);
+          pose_end_x_pub.publish(pose_end_x);
+          pose_end_y_pub.publish(pose_end_y);
+          pose_end_z_pub.publish(pose_end_z);
+      }
+
       // posa nominale del link nel frame base
       Eigen::Affine3d T_b_lnom=chain->getTransformationLink(q_nom,link_name);
-      Eigen::Vector3d o_lnom_in_b=T_b_l.translation(); // origine di lnom vista in b
+      Eigen::Vector3d o_lnom_in_b=T_b_lnom.translation(); // origine di lnom vista in b
       Eigen::Vector6d twist_on_lnom_in_b=chain->getTwistLink(q_nom,Dq_nom,link_name); // twist (vel lin, vel rot) del link lnom visto nel frame b
 
       // cwise è l'equivalente di .* in matlab
-      Eigen::Vector3d self_elastic_force_on_l_in_b=const_mol_self_spring*self_spring.cwiseProduct(o_lnom_in_b-o_l_in_b);
+      Eigen::Vector3d self_elastic_force_on_l_in_b=const_mol_self_spring_geom*self_spring.cwiseProduct(o_lnom_in_b-o_l_in_b);
 
       // implementa forze damping
-      Eigen::Vector3d self_damping_force_on_l_in_b=const_mol_self_spring*self_damper.cwiseProduct(twist_on_lnom_in_b.head(3)-twist_on_l_in_b.head(3));
+      Eigen::Vector3d self_damping_force_on_l_in_b=const_mol_self_damper_geom*self_damper.cwiseProduct(twist_on_lnom_in_b.head(3)-twist_on_l_in_b.head(3));
 
       Eigen::Vector3d elastic_force_on_l_in_b;
       elastic_force_on_l_in_b.setZero();
@@ -554,8 +763,8 @@ int main(int argc, char **argv)
     distance_hr.data=min_distance_tot;
     dist_pub.publish(distance_hr);
 
-    joint_torque+=const_mol_self_spring*joint_spring.cwiseProduct(q_nom-q_target);
-    joint_torque+=const_mol_self_spring*joint_damper.cwiseProduct(Dq_nom-Dq_target);
+    joint_torque+=const_mol_self_spring_joint*joint_spring.cwiseProduct(q_nom-q_target);
+    joint_torque+=const_mol_self_damper_joint*joint_damper.cwiseProduct(Dq_nom-Dq_target);
 
     // coppie = B(q)*DDq+nl(q,Dq)
     // dove nl contiene le coppie di Coriolis e dovute alla gravità
@@ -626,6 +835,32 @@ int main(int argc, char **argv)
 
       joint_target.position.at(idx)=q_target(idx);
       joint_target.velocity.at(idx)=Dq_target(idx);
+    }
+
+    if (restart_elasticity)
+    {
+        nh.setParam("restart_elasticity",false);
+
+        q_target(0)=-2.32081376095612;
+        q_target(1)=-2.190669313833594;
+        q_target(2)=-1.8597655679242484;
+        q_target(3)=-0.6619541005929515;
+        q_target(4)=-1.570796307949483;
+        q_target(5)=0.7500174339545178;
+
+        for (unsigned int idx=0;idx<chain->getActiveJointsNumber();idx++)
+        {
+            ROS_INFO_STREAM("idx = " << idx << std::endl);
+            q_distance(idx)=q_target(idx)-q_nom(idx);
+            Dq_target(idx)=0.0;
+            Dq_distance(idx)=Dq_target(idx)-Dq_nom(idx);
+            joint_target.position.at(idx)=q_target(idx);
+            joint_target.velocity.at(idx)=Dq_target(idx);
+            joint_distance.position.at(idx)=q_distance(idx);
+            joint_distance.velocity.at(idx)=Dq_distance(idx);
+        }
+
+
     }
 
     joint_target.header.stamp=ros::Time::now(); // aggiorno tempo messaggio (per log, print)

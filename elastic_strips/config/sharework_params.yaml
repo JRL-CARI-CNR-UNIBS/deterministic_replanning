@@ -3,75 +3,77 @@ tool_frame: open_tip
 
 shoulder_link:
   # molle di "repulsione"
-  # spring: [0.10,0.10,0.10]
-  # spring: [1.0,1.0,1.0]
-  spring: [10,10,10]
+  spring: [0.5,0.5,0.5]
   damper: [0.001,0.001,0.001]
   activation_distance: 1.0 #metri
   #molle di "attrazione"
-  self_spring: [1100,1100,1100]
-  self_damper: [0.5,0.5,0.5]
+  self_spring: [60,60,60]
+  self_damper: [60,60,60]
 
 upper_arm_link:
   # molle di "repulsione"
-  # spring: [0.10,0.10,0.10]
-  # spring: [1.0,1.0,1.0]
-  spring: [10,10,10]
+  spring: [0.55,0.55,0.55]
   damper: [0.001,0.001,0.001]
   activation_distance: 1.0 #metri
   #molle di "attrazione"
-  self_spring: [1070,1070,1070]
-  self_damper: [0.5,0.5,0.5]
+  self_spring: [56,56,56]
+  self_damper: [56,56,56]
 
 forearm_link:
   # molle di "repulsione"
-  # spring: [0.11,0.11,0.11]
-  # spring: [1.1,1.1,1.1]
-  spring: [11,11,11]
+  spring: [0.6,0.6,0.6]
   damper: [0.001,0.001,0.001]
   activation_distance: 1.0 #metri
   #molle di "attrazione"
-  self_spring: [1050,1050,1050]
-  self_damper: [0.5,0.5,0.5]
+  self_spring: [52,52,52]
+  self_damper: [52,52,52]
 
 wrist_1_link:
   # molle di "repulsione"
-  # spring: [0.13,0.13,0.13]
-  # spring: [1.3,1.3,1.3]
-  spring: [13,13,13]
+  spring: [0.65,0.65,0.65]
   damper: [0.001,0.001,0.001]
   activation_distance: 1.0 #metri
   #molle di "attrazione"
-  self_spring: [1020,1020,1020]
-  self_damper: [0.5,0.5,0.5]
+  self_spring: [48,48,48]
+  self_damper: [48,48,48]
 
 wrist_2_link:
   # molle di "repulsione"
-  # spring: [0.14,0.14,0.14]
-  # spring: [1.4,1.4,1.4]
-  spring: [14,14,14]
+  spring: [0.7,0.7,0.7]
   damper: [0.001,0.001,0.001]
   activation_distance: 1.0 #metri
   #molle di "attrazione"
-  self_spring: [1000,1000,1000]
-  self_damper: [0.5,0.5,0.5]
+  self_spring: [44,44,44]
+  self_damper: [44,44,44]
 
 wrist_3_link:
   # molle di "repulsione"
-  # spring: [0.15,0.15,0.15]
-  # spring: [1.5,1.5,1.5]
-  spring: [15,15,15]
+  spring: [0.75,0.75,0.75]
   damper: [0.001,0.001,0.001]
   activation_distance: 1.0 #metri
   #molle di "attrazione"
-  self_spring: [980,980,980]
-  self_damper: [0.5,0.5,0.5]
+  self_spring: [40,40,40]
+  self_damper: [40,40,40]
 
-joint_spring: [60,30,30,12,12,12]
-joint_damper: [70,70,70,30,30,30]
 
-max_joint_deflaction: [0.1,0.12,0.15,0.2,0.25,0.3] # [0.15,0.15,0.25,0.2,0.25,0.3] [0.1,0.12,0.15,0.2,0.25,0.3] [10.0,10.0,10.0,10.0,10.0,10.0]
+
+joint_spring: [3,3,3,2.4,2.4,2.4]
+joint_damper: [10,10,10,3,3,3]
+
+max_joint_deflaction: [10.0,10.0,10.0,10.0,10.0,10.0]
+# [0.15,0.15,0.25,0.2,0.25,0.3] [0.1,0.12,0.15,0.2,0.25,0.3]
 
 max_reduction: 0.5
 upper_limit_repulsion: 0.9 #0.9
 lower_limit_repulsion: 0.1 #0.1
+
+
+molt_cmssg: 1
+molt_cmsdg: 1
+
+molt_cms: 1
+molt_cmssj: 1
+molt_cmsdj: 1
+
+restart_elasticity: false
+
